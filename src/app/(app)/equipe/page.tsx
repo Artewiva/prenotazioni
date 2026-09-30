@@ -34,23 +34,27 @@ export default function TeamPage() {
   const [deleting, setDeleting] = useState<User | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const r = await api<{ users: User[]; me: number }>("/api/users");
-      setUsers(r.users);
-      setMeId(r.me);
-      const me = await api<{ user: { role: Role } }>("/api/auth/me");
-      setMeRole(me.user.role);
-    } catch {
-      /* ignora */
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    load();
+    let active = true;
+    api<{ users: User[]; me: number }>("/api/users")
+      .then((r) => {
+        if (!active) return;
+        setUsers(r.users);
+        setMeId(r.me);
+        return api<{ user: { role: Role } }>("/api/auth/me");
+      })
+      .then((me) => {
+        if (active && me) setMeRole(me.user.role);
+      })
+      .catch(() => {
+        /* ignora */
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const isAdmin = meRole === "admin";
@@ -150,7 +154,7 @@ export default function TeamPage() {
       {!isAdmin && (
         <div className="mb-4 rounded-xl border border-line bg-card px-4 py-3 text-[12.5px] text-soft shadow-card">
           Hai il ruolo <strong className="text-ink">Manager</strong>: puoi consultare
-          l'equipaggio, ma solo un amministratore può modificarlo.
+          l&apos;equipaggio, ma solo un amministratore può modificarlo.
         </div>
       )}
 

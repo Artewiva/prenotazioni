@@ -47,7 +47,7 @@ export default function CalendarPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [monthRes, setMonthRes] = useState<Reservation[]>([]);
   const [dayRes, setDayRes] = useState<Reservation[]>([]);
-  const [loadingDay, setLoadingDay] = useState(true);
+  const [loadedDayKey, setLoadedDayKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [bump, setBump] = useState(0);
   const [modal, setModal] = useState<ModalState>(null);
@@ -55,6 +55,8 @@ export default function CalendarPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const today = todayISO();
+  const dayKey = `${selected}:${bump}`;
+  const loadingDay = loadedDayKey !== dayKey;
 
   useEffect(() => {
     Promise.all([
@@ -81,19 +83,24 @@ export default function CalendarPage() {
 
   // Giorno selezionato
   useEffect(() => {
-    setLoadingDay(true);
+    let active = true;
     api<{ reservations: Reservation[] }>(`/api/reservations?date=${selected}`)
       .then((r) => {
+        if (!active) return;
         setDayRes(
           [...r.reservations].sort((a, b) => a.time.localeCompare(b.time)),
         );
-        setLoadingDay(false);
+        setLoadedDayKey(dayKey);
       })
       .catch((e) => {
+        if (!active) return;
         setError(errMsg(e));
-        setLoadingDay(false);
+        setLoadedDayKey(dayKey);
       });
-  }, [selected, bump]);
+    return () => {
+      active = false;
+    };
+  }, [selected, bump, dayKey]);
 
   const cells = useMemo(() => {
     const first = new Date(cursor.y, cursor.m, 1);

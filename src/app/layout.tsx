@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import "./globals.css";
-import { ensureSeeded } from "@/lib/seed";
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
+const fraunces = localFont({
+  src: "./fonts/fraunces-latin-wght-normal.woff2",
+  weight: "100 900",
+  display: "swap",
   variable: "--font-fraunces",
 });
 
-const manrope = Manrope({
-  subsets: ["latin"],
+const manrope = localFont({
+  src: "./fonts/manrope-latin-wght-normal.woff2",
+  weight: "200 800",
+  display: "swap",
   variable: "--font-manrope",
 });
 
@@ -22,6 +25,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   try {
+    const { ensureSeeded } = await import("@/lib/seed");
     await ensureSeeded();
   } catch {
     // Il seed non deve mai bloccare il render: i dati compariranno al prossimo avvio.
