@@ -53,12 +53,20 @@ export default function ReservationsPage() {
   const [to, setTo] = useState(addDaysISO(today, 14));
   const [status, setStatus] = useState<StatusFilter>("tutte");
   const [rows, setRows] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
   const [tables, setTables] = useState<Table[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [modal, setModal] = useState<{ reservation: Reservation | null } | null>(null);
   const [deleting, setDeleting] = useState<Reservation | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const params = new URLSearchParams();
+  if (from) params.set("dateFrom", from);
+  if (to) params.set("dateTo", to);
+  if (status !== "tutte") params.set("status", status);
+  if (query) params.set("q", query);
+  const requestQuery = params.toString();
+  const loading = loadedQuery !== requestQuery;
 
   useEffect(() => {
     const t = setTimeout(() => setQuery(q.trim()), 300);
@@ -78,17 +86,20 @@ export default function ReservationsPage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (from) params.set("dateFrom", from);
-    if (to) params.set("dateTo", to);
-    if (status !== "tutte") params.set("status", status);
-    if (query) params.set("q", query);
-    api<{ reservations: Reservation[] }>(`/api/reservations?${params.toString()}`)
-      .then((r) => setRows(r.reservations))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [from, to, status, query]);
+    let active = true;
+    api<{ reservations: Reservation[] }>(`/api/reservations?${requestQuery}`)
+      .then((r) => {
+        if (!active) return;
+        setRows(r.reservations);
+        setLoadedQuery(requestQuery);
+      })
+      .catch(() => {
+        if (active) setLoadedQuery(requestQuery);
+      });
+    return () => {
+      active = false;
+    };
+  }, [requestQuery]);
 
   const hasFilters = status !== "tutte" || query !== "" || from !== "" || to !== "";
 

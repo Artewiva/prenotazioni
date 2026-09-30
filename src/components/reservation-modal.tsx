@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   buildWaUrl,
   cn,
@@ -31,16 +31,7 @@ interface FormState {
   notes: string;
 }
 
-export function ReservationModal({
-  open,
-  onClose,
-  reservation,
-  prefill,
-  tables,
-  settings,
-  onSaved,
-  onDelete,
-}: {
+interface ReservationModalProps {
   open: boolean;
   onClose: () => void;
   reservation?: Reservation | null;
@@ -49,19 +40,58 @@ export function ReservationModal({
   settings: Settings;
   onSaved: (r: Reservation, isNew: boolean) => void;
   onDelete?: (r: Reservation) => void;
-}) {
+}
+
+export function ReservationModal(props: ReservationModalProps) {
+  if (!props.open) return null;
+
+  const key = props.reservation ? `reservation-${props.reservation.id}` : "new-reservation";
+  return <ReservationModalContent key={key} {...props} />;
+}
+
+function ReservationModalContent({
+  open,
+  onClose,
+  reservation,
+  prefill,
+  tables,
+  settings,
+  onSaved,
+  onDelete,
+}: ReservationModalProps) {
   const toast = useToast();
-  const [form, setForm] = useState<FormState>({
-    customerName: "",
-    phone: "",
-    email: "",
-    party: "2",
-    tableId: "",
-    date: todayISO(),
-    time: settings.openingHour,
-    status: "in_attesa",
-    source: "telefono",
-    notes: "",
+  const [form, setForm] = useState<FormState>(() => {
+    const tableId = reservation
+      ? reservation.tableId
+      : prefill?.tableId ?? tables.find((table) => table.active)?.id ?? tables[0]?.id ?? 0;
+    const date = reservation?.date ?? prefill?.date ?? todayISO();
+    let time = reservation?.time ?? prefill?.time;
+    if (!time) {
+      const availableSlots = slotsFor(
+        settings.openingHour,
+        settings.closingHour,
+        settings.slotMinutes,
+      );
+      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const isToday = date === todayISO();
+      time =
+        availableSlots.find((slot) => !isToday || timeToMin(slot) >= nowMin) ??
+        availableSlots[0] ??
+        "20:00";
+    }
+
+    return {
+      customerName: reservation?.customerName ?? "",
+      phone: reservation?.phone ?? "",
+      email: reservation?.email ?? "",
+      party: String(reservation?.party ?? 2),
+      tableId: String(tableId),
+      date,
+      time,
+      status: reservation?.status ?? "in_attesa",
+      source: reservation?.source ?? "telefono",
+      notes: reservation?.notes ?? "",
+    };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -74,35 +104,6 @@ export function ReservationModal({
     }
     return s;
   }, [settings, reservation]);
-
-  useEffect(() => {
-    if (!open) return;
-    const tableId = reservation
-      ? reservation.tableId
-      : prefill?.tableId ?? activeTables[0]?.id ?? tables[0]?.id ?? 0;
-    const date = reservation?.date ?? prefill?.date ?? todayISO();
-    let time = reservation?.time ?? prefill?.time;
-    if (!time) {
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-      const isToday = date === todayISO();
-      time =
-        slots.find((s) => !isToday || timeToMin(s) >= nowMin) ?? slots[0] ?? "20:00";
-    }
-    setForm({
-      customerName: reservation?.customerName ?? "",
-      phone: reservation?.phone ?? "",
-      email: reservation?.email ?? "",
-      party: String(reservation?.party ?? 2),
-      tableId: String(tableId),
-      date,
-      time,
-      status: reservation?.status ?? "in_attesa",
-      source: reservation?.source ?? "telefono",
-      notes: reservation?.notes ?? "",
-    });
-    setErrors({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, reservation?.id]);
 
   const selectedTable = tables.find((t) => t.id === Number(form.tableId));
 

@@ -48,21 +48,23 @@ export default function TablesPage() {
 
   const today = todayISO();
 
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      const r = await api<{ tables: TableRow[] }>(`/api/tables?date=${today}`);
-      setTables(r.tables);
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    load();
+    let active = true;
+    api<{ tables: TableRow[] }>(`/api/tables?date=${today}`)
+      .then((r) => {
+        if (!active) return;
+        setTables(r.tables);
+        setError("");
+      })
+      .catch((e) => {
+        if (active) setError(errMsg(e));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [today]);
 
   const zones = useMemo(() => {

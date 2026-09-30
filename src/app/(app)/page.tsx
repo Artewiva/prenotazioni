@@ -39,6 +39,23 @@ interface DashData {
   settings: Settings;
 }
 
+async function fetchDashboardData(today: string, weekEnd: string): Promise<DashData> {
+  const [t, w, tb, s] = await Promise.all([
+    api<{ reservations: Reservation[] }>(`/api/reservations?date=${today}`),
+    api<{ reservations: Reservation[] }>(
+      `/api/reservations?dateFrom=${today}&dateTo=${weekEnd}`,
+    ),
+    api<{ tables: Table[] }>("/api/tables"),
+    api<{ settings: Settings }>("/api/settings"),
+  ]);
+  return {
+    today: t.reservations,
+    week: w.reservations,
+    tables: tb.tables,
+    settings: s.settings,
+  };
+}
+
 function StatCard({
   label,
   value,
@@ -82,24 +99,29 @@ export default function DashboardPage() {
   const weekEnd = addDaysISO(today, 6);
 
   async function load() {
-    setError("");
     try {
-      const [t, w, tb, s] = await Promise.all([
-        api<{ reservations: Reservation[] }>(`/api/reservations?date=${today}`),
-        api<{ reservations: Reservation[] }>(
-          `/api/reservations?dateFrom=${today}&dateTo=${weekEnd}`,
-        ),
-        api<{ tables: Table[] }>("/api/tables"),
-        api<{ settings: Settings }>("/api/settings"),
-      ]);
-      setData({ today: t.reservations, week: w.reservations, tables: tb.tables, settings: s.settings });
+      const nextData = await fetchDashboardData(today, weekEnd);
+      setError("");
+      setData(nextData);
     } catch (e) {
       setError(errMsg(e));
     }
   }
 
   useEffect(() => {
-    load();
+    let active = true;
+    fetchDashboardData(today, weekEnd)
+      .then((nextData) => {
+        if (!active) return;
+        setError("");
+        setData(nextData);
+      })
+      .catch((e) => {
+        if (active) setError(errMsg(e));
+      });
+    return () => {
+      active = false;
+    };
   }, [today, weekEnd]);
 
   function handleSaved(r: Reservation, isNew: boolean) {
@@ -158,7 +180,14 @@ export default function DashboardPage() {
         <PageHeader title="Panoramica" subtitle="La serata in un colpo d'occhio" />
         <div className="rounded-xl border border-bad/25 bg-badsoft p-6 text-center">
           <p className="text-sm font-semibold text-bad">{error}</p>
-          <Button variant="ghost" className="mt-4" onClick={load}>
+          <Button
+            variant="ghost"
+            className="mt-4"
+            onClick={() => {
+              setError("");
+              void load();
+            }}
+          >
             Riprova
           </Button>
         </div>
